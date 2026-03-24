@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospital Patient Tracker &mdash; WebAssembly</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,wght@0,700;1,600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #eef4f9;
+      --surface:     #ffffff;
+      --surface2:    #f4f9fc;
+      --border:      #d0e4ef;
+      --border2:     #b8d4e8;
+      --teal:        #0e7a8b;
+      --teal-light:  #17a5ba;
+      --teal-dim:    #0e7a8b22;
+      --teal-glow:   #17a5ba44;
+      --blue:        #1b5e8a;
+      --blue-light:  #2980b9;
+      --blue-pale:   #e8f3fa;
+      --green:       #1a9e6e;
+      --green-pale:  #e6f7f1;
+      --text:        #0d2d40;
+      --text-2:      #3b6070;
+      --text-muted:  #7a9daf;
+      --mono:        'JetBrains Mono', monospace;
+      --sans:        'DM Sans', sans-serif;
+      --display:     'Fraunces', serif;
+      --radius:      14px;
+      --radius-sm:   8px;
+      --shadow:      0 4px 24px rgba(14,122,139,.08), 0 1px 4px rgba(14,122,139,.06);
+      --shadow-lg:   0 12px 48px rgba(14,122,139,.13), 0 2px 8px rgba(14,122,139,.07);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      background-image:
+        radial-gradient(circle at 18% 12%, #c8e8f755 0%, transparent 52%),
+        radial-gradient(circle at 85% 80%, #d0f0ea44 0%, transparent 48%),
+        radial-gradient(#c5dce888 1px, transparent 1px);
+      background-size: auto, auto, 28px 28px;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ═══════════ HEADER ═══════════ */
+    header {
+      padding: 44px 0 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+    }
+    .cross-icon {
+      width: 48px; height: 48px;
+      position: relative;
+      animation: fadeDown .4s ease both;
+    }
+    .cross-icon::before,
+    .cross-icon::after {
+      content: '';
+      position: absolute;
+      background: linear-gradient(135deg, var(--teal-light), var(--teal));
+      border-radius: 4px;
+      box-shadow: 0 2px 10px var(--teal-glow);
+    }
+    .cross-icon::before { width: 15px; height: 48px; left: 16px; top: 0; }
+    .cross-icon::after  { width: 48px; height: 15px; top: 16px;  left: 0; }
+
+    .header-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11.5px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--teal);
+      background: var(--teal-dim); border: 1px solid var(--teal-glow);
+      padding: 5px 16px; border-radius: 99px;
+      animation: fadeDown .5s .05s ease both;
+    }
+    .header-eyebrow .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--teal-light);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%     { opacity: .4; transform: scale(.7); }
+    }
+    .header-title {
+      font-family: var(--display);
+      font-size: clamp(24px, 5vw, 40px);
+      font-weight: 700; line-height: 1.15;
+      letter-spacing: -.02em; color: var(--text);
+      animation: fadeDown .55s .1s ease both;
+    }
+    .header-title span { color: var(--teal); }
+    .header-sub {
+      font-size: 14px; color: var(--text-2); font-weight: 400;
+      animation: fadeDown .6s .15s ease both;
+    }
+
+    /* ═══════════ STATUS BAR ═══════════ */
+    .status-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 22px;
+      box-shadow: var(--shadow);
+      animation: fadeUp .6s .2s ease both;
+    }
+    .status-left { display: flex; align-items: center; gap: 10px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11.5px; font-weight: 600; letter-spacing: .07em;
+      text-transform: uppercase; padding: 5px 13px; border-radius: 99px;
+    }
+    .badge-wasm { background: var(--green-pale); color: var(--green); border: 1px solid #a8e6cf; }
+    .badge-wasm .led {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); animation: pulse 1.8s ease-in-out infinite;
+    }
+    .badge-c { background: var(--blue-pale); color: var(--blue); border: 1px solid #b8d8f0; }
+    .status-meta { font-size: 12.5px; color: var(--text-muted); }
+    .status-meta strong { color: var(--text-2); }
+
+    /* ═══════════ INFO CARDS ═══════════ */
+    .info-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px; animation: fadeUp .65s .25s ease both;
+    }
+    .info-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px;
+      box-shadow: var(--shadow); display: flex; align-items: flex-start; gap: 14px;
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+    }
+    .info-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border2); }
+    .info-card-icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      display: grid; place-items: center; font-size: 19px; flex-shrink: 0;
+    }
+    .icon-teal  { background: var(--teal-dim); }
+    .icon-blue  { background: var(--blue-pale); }
+    .icon-green { background: var(--green-pale); }
+    .info-card-body h4 {
+      font-size: 12.5px; font-weight: 600; color: var(--text-2);
+      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px;
+    }
+    .info-card-body p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+    /* ═══════════ QUICK REFERENCE ═══════════ */
+    .quickref {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 26px;
+      box-shadow: var(--shadow); animation: fadeUp .7s .3s ease both;
+    }
+    .quickref-title {
+      font-size: 11.5px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .quickref-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .cmd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 8px; }
+    .cmd-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      border-radius: var(--radius-sm); background: var(--surface);
+      border: 1px solid var(--border); cursor: default;
+      transition: background .18s, border-color .18s, transform .18s;
+    }
+    .cmd-item:hover { background: var(--teal-dim); border-color: var(--teal-glow); transform: translateX(2px); }
+    .cmd-num {
+      font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+      color: #fff; background: var(--teal);
+      width: 22px; height: 22px; border-radius: 5px;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .cmd-label { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+
+    /* ═══════════ CONSOLE PANEL ═══════════ */
+    .console-section {
+      border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow-lg); border: 1px solid var(--border2);
+      animation: fadeUp .75s .35s ease both;
+    }
+    .console-bar {
+      background: linear-gradient(135deg, #0d2d40 0%, #0e4a60 100%);
+      padding: 13px 20px; display: flex; align-items: center; gap: 14px;
+    }
+    .console-dots { display: flex; gap: 7px; }
+    .console-dots span { width: 12px; height: 12px; border-radius: 50%; transition: filter .2s; }
+    .console-dots:hover span { filter: brightness(1.3); }
+    .dot-red    { background: #ff5f57; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green  { background: #28c840; }
+    .console-bar-title {
+      font-family: var(--mono); font-size: 12.5px; color: #6aafc8;
+      letter-spacing: .04em; flex: 1; text-align: center;
+    }
+    .console-bar-badge {
+      font-family: var(--mono); font-size: 10px; font-weight: 700;
+      letter-spacing: .1em; color: #28c840; background: #0a1e28;
+      border: 1px solid #28c84044; padding: 3px 9px; border-radius: 4px;
+    }
+
+    /* ── Output screen ── */
+    .console-screen {
+      background: #071c28;
+      padding: 22px 26px;
+      min-height: 360px;
+      max-height: 540px;
+      overflow-y: auto;
+      position: relative;
+    }
+    .console-screen::-webkit-scrollbar { width: 7px; }
+    .console-screen::-webkit-scrollbar-track { background: #0a1e2c; }
+    .console-screen::-webkit-scrollbar-thumb { background: #1b4a65; border-radius: 4px; }
+    .console-screen::-webkit-scrollbar-thumb:hover { background: #236080; }
+
+    .output-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #b8eaf8;
+      font-family: var(--mono);
+      font-size: 13.5px;
+      line-height: 1.78;
+    }
+
+    /* blinking cursor */
+    .cursor-blink::after {
+      content: '\2588';
+      color: var(--teal-light);
+      animation: blink 1s step-end infinite;
+      font-size: 13px;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* loading overlay */
+    .loading-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(7,28,40,.92); z-index: 10; gap: 12px;
+      transition: opacity .3s;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #1b4a65;
+      border-top-color: var(--teal-light);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { font-family: var(--mono); font-size: 12px; color: #6aafc8; }
+
+    /* ── Input row ── */
+    .console-input-row {
+      background: #071c28;
+      border-top: 1px solid #0e3a52;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .console-prompt-sym {
+      padding: 12px 6px 12px 20px;
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--teal-light);
+      font-weight: 700;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .console-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #f0d070;
+      font-family: var(--mono);
+      font-size: 13.5px;
+      padding: 12px 8px;
+      caret-color: var(--teal-light);
+    }
+    .console-input::placeholder { color: #336a88; }
+    .console-input:disabled { opacity: .4; cursor: not-allowed; }
+
+    .send-btn {
+      padding: 8px 18px;
+      margin: 6px 12px;
+      background: #0e3a52;
+      color: var(--teal-light);
+      border: 1px solid var(--teal-light);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover {
+      background: rgba(23,165,186,.2);
+      box-shadow: 0 0 10px rgba(23,165,186,.3);
+    }
+    .send-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* hidden canvas */
+    canvas[id="canvas"] { display: none !important; }
+
+    /* ═══════════ FOOTER ═══════════ */
+    footer { text-align: center; padding-top: 4px; animation: fadeUp .8s .4s ease both; }
+    .footer-inner {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12.5px; color: var(--text-muted);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: 10px 24px; box-shadow: var(--shadow);
+    }
+    .footer-inner a { color: var(--teal); text-decoration: none; font-weight: 600; transition: color .18s; }
+    .footer-inner a:hover { color: var(--teal-light); }
+    .fsep { color: var(--border2); }
+
+    /* ═══════════ ANIMATIONS ═══════════ */
+    @keyframes fadeDown { from { opacity:0; transform: translateY(-14px); } to { opacity:1; transform: translateY(0); } }
+    @keyframes fadeUp   { from { opacity:0; transform: translateY(18px); } to { opacity:1; transform: translateY(0); } }
+
+    @media (max-width: 640px) {
+      .status-bar { flex-direction: column; align-items: flex-start; }
+      .header-title { font-size: 22px; }
+      .console-bar-title { display: none; }
+      .output-text { font-size: 12px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="cross-icon" aria-hidden="true"></div>
+    <span class="header-eyebrow">
+      <span class="dot"></span>
+      Healthcare Information System
+    </span>
+    <h1 class="header-title">
+      Hospital Patient Registration<br>
+      <span>&amp; Follow-up Tracker</span>
+    </h1>
+    <p class="header-sub">
+      C Program compiled to <strong>WebAssembly</strong> via Emscripten &mdash; running natively in your browser
+    </p>
+  </header>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar" role="status">
+    <div class="status-left">
+      <span class="badge badge-wasm"><span class="led"></span> WASM Backend Active</span>
+      <span class="badge badge-c">C99 Runtime</span>
+    </div>
+    <span class="status-meta">
+      Platform: <strong>WebAssembly &middot; Emscripten</strong> &nbsp;&middot;&nbsp;
+      Files: <strong>patients.txt</strong> &amp; <strong>visits.txt</strong>
+    </span>
+  </div>
+
+  <!-- FEATURE CARDS -->
+  <div class="info-grid" role="list">
+    <div class="info-card" role="listitem">
+      <div class="info-card-icon icon-teal" aria-hidden="true">&#x1F3E5;</div>
+      <div class="info-card-body"><h4>Patient Registry</h4><p>Register &amp; manage up to 200 patient records with full validation.</p></div>
+    </div>
+    <div class="info-card" role="listitem">
+      <div class="info-card-icon icon-blue" aria-hidden="true">&#x1F4CB;</div>
+      <div class="info-card-body"><h4>Visit Tracking</h4><p>Log diagnoses and prescriptions &mdash; up to 1,000 entries.</p></div>
+    </div>
+    <div class="info-card" role="listitem">
+      <div class="info-card-icon icon-green" aria-hidden="true">&#x1F4BE;</div>
+      <div class="info-card-body"><h4>Persistent Storage</h4><p>Save and reload data via Emscripten's virtual MEMFS file system.</p></div>
+    </div>
+    <div class="info-card" role="listitem">
+      <div class="info-card-icon icon-teal" aria-hidden="true">&#x1F50D;</div>
+      <div class="info-card-body"><h4>Frequent Visitors</h4><p>Auto-flags patients with more than 3 recorded visits.</p></div>
+    </div>
+  </div>
+
+  <!-- QUICK REFERENCE -->
+  <div class="quickref" role="navigation">
+    <div class="quickref-title">Menu Quick Reference</div>
+    <div class="cmd-grid">
+      <div class="cmd-item"><span class="cmd-num">1</span><span class="cmd-label">Register Patient</span></div>
+      <div class="cmd-item"><span class="cmd-num">2</span><span class="cmd-label">Add Visit Record</span></div>
+      <div class="cmd-item"><span class="cmd-num">3</span><span class="cmd-label">Search Patient</span></div>
+      <div class="cmd-item"><span class="cmd-num">4</span><span class="cmd-label">Display All Patients</span></div>
+      <div class="cmd-item"><span class="cmd-num">5</span><span class="cmd-label">Show Visit History</span></div>
+      <div class="cmd-item"><span class="cmd-num">6</span><span class="cmd-label">Frequent Visitors</span></div>
+      <div class="cmd-item"><span class="cmd-num">7</span><span class="cmd-label">Save to Files</span></div>
+      <div class="cmd-item"><span class="cmd-num">8</span><span class="cmd-label">Load from Files</span></div>
+      <div class="cmd-item"><span class="cmd-num">9</span><span class="cmd-label">Exit Program</span></div>
+    </div>
+  </div>
+
+  <!-- CONSOLE PANEL -->
+  <div class="console-section" role="region" aria-label="Program console">
+    <!-- Title bar -->
+    <div class="console-bar">
+      <div class="console-dots" aria-hidden="true">
+        <span class="dot-red"></span>
+        <span class="dot-yellow"></span>
+        <span class="dot-green"></span>
+      </div>
+      <span class="console-bar-title">hospital_tracker.wasm &mdash; interactive console</span>
+      <span class="console-bar-badge" id="wasm-status-badge">LOADING</span>
+    </div>
+
+    <!-- Output screen (div, NOT textarea) -->
+    <div class="console-screen" id="screen">
+      <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p>Compiling WebAssembly module&hellip;</p>
+      </div>
+      <div id="output" class="output-text cursor-blink"></div>
+    </div>
+
+    <!-- Input row (separate text input + send button) -->
+    <div class="console-input-row">
+      <span class="console-prompt-sym">&rsaquo;</span>
+      <input id="input" class="console-input" type="text"
+             autocomplete="off" spellcheck="false"
+             placeholder="Type input and press Enter..."
+             disabled />
+      <button class="send-btn" id="sendBtn" disabled>SEND</button>
+    </div>
+
+    <canvas id="canvas" style="display:none"></canvas>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <span>Built with</span>
+      <strong style="color:var(--text-2)">C99</strong>
+      <span class="fsep">&middot;</span>
+      <strong style="color:var(--text-2)">WebAssembly</strong>
+      <span class="fsep">&middot;</span>
+      <a href="https://emscripten.org" target="_blank" rel="noopener">Emscripten</a>
+      <span class="fsep">&middot;</span>
+      <a href="https://pages.github.com" target="_blank" rel="noopener">GitHub Pages</a>
+    </div>
+  </footer>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     EMSCRIPTEN MODULE + STDIN/STDOUT via FS.init
+     ────────────────────────────────────────────────────────────
+     Pattern from working reference:
+       - Global stdinBuffer[] holds char codes
+       - FS.init() connects stdin/stdout/stderr
+       - C-side EM_ASYNC_JS polls stdinBuffer
+       - User types in separate input field + Send button
+════════════════════════════════════════════════════════════ -->
+<script>
+  var outputEl  = document.getElementById('output');
+  var inputEl   = document.getElementById('input');
+  var sendBtn   = document.getElementById('sendBtn');
+  var loadingEl = document.getElementById('loading');
+  var screenEl  = document.getElementById('screen');
+  var badgeEl   = document.getElementById('wasm-status-badge');
+
+  /* ── Append text to the output div ──────────────────────── */
+  function appendOutput(text) {
+    outputEl.textContent += text;
+    screenEl.scrollTop = screenEl.scrollHeight;
+  }
+
+  /* ── Called when WASM runtime is ready ──────────────────── */
+  function setReady() {
+    loadingEl.style.display = 'none';
+    inputEl.disabled = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+
+    badgeEl.textContent = 'LIVE';
+    badgeEl.style.color = '#28c840';
+    badgeEl.style.borderColor = '#28c84044';
+  }
+
+  /* ════════════════════════════════════════════════════════════
+   *  STDIN BUFFER
+   *  The C-side EM_ASYNC_JS wait_for_input() polls this array.
+   *  When it has chars, fgets() reads from it via FS.init stdin.
+   * ════════════════════════════════════════════════════════════ */
+  var stdinBuffer = [];
+
+  function enqueueInput(text) {
+    var line = text + '\n';
+    for (var i = 0; i < line.length; i++) {
+      stdinBuffer.push(line.charCodeAt(i));
+    }
+  }
+
+  /* ── Send handler (button click or Enter key) ───────────── */
+  function handleSend() {
+    var val = inputEl.value;
+    appendOutput(val + '\n');     /* echo typed text in output */
+    enqueueInput(val);            /* push into stdin buffer */
+    inputEl.value = '';
+    inputEl.focus();
+  }
+
+  sendBtn.addEventListener('click', handleSend);
+
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
+  });
+
+  /* ════════════════════════════════════════════════════════════
+   *  EMSCRIPTEN MODULE OBJECT
+   * ════════════════════════════════════════════════════════════ */
+  var Module = {
+
+    print: function(text) {
+      appendOutput(text + '\n');
+    },
+
+    printErr: function(text) {
+      appendOutput('[ERR] ' + text + '\n');
+    },
+
+    onRuntimeInitialized: function() {
+      setReady();
+    },
+
+    canvas: (function() {
+      return document.getElementById('canvas');
+    })()
+  };
+
+  /* ── Connect stdin/stdout/stderr via FS.init ────────────── */
+  /*  stdout uses char-by-char output (so prompts without \n   */
+  /*  appear immediately) with TextDecoder for proper UTF-8    */
+  /*  multi-byte support (box-drawing chars ╔║╠╚ etc.)         */
+  var stdoutDecoder = new TextDecoder('utf-8');
+  var stderrDecoder = new TextDecoder('utf-8');
+
+  Module['preRun'] = function() {
+
+    FS.init(
+      /* stdin — returns next char from buffer, or null if empty */
+      function() {
+        if (stdinBuffer.length === 0) {
+          return null;
+        }
+        return stdinBuffer.shift();
+      },
+
+      /* stdout — char by char, decoded as streaming UTF-8 */
+      function(c) {
+        if (c === null) return;
+        var text = stdoutDecoder.decode(new Uint8Array([c]), {stream: true});
+        if (text) appendOutput(text);
+      },
+
+      /* stderr — same treatment */
+      function(c) {
+        if (c === null) return;
+        var text = stderrDecoder.decode(new Uint8Array([c]), {stream: true});
+        if (text) appendOutput(text);
+      }
+    );
+
+  };
+</script>
+
+{{{ SCRIPT }}}
+
+</body>
+</html>
