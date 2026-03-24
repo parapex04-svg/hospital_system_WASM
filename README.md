@@ -1,1 +1,0 @@
-# hospital_system_WASM
