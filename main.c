@@ -2,7 +2,7 @@
  * ============================================================
  *  Hospital Patient Registration & Follow-up Tracker
  * ============================================================
- *  Author  : Senior C Engineer
+ *  Author  : Srishant Jena
  *  File    : main.c
  *  Build   : emcc main.c -o index.html
  *            gcc  main.c -o hospital   (native test)
